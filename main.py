@@ -1,6 +1,7 @@
 import asyncio
 from typing import List, Optional
 
+import requests
 from fastapi import FastAPI, Header, HTTPException, status
 from pydantic import BaseModel, Field, field_validator
 
@@ -12,6 +13,25 @@ app = FastAPI(
     description="API para ejecutar comandos de la herramienta Infinitools",
     version="1.0.0",
 )
+
+
+def send_discord_notification(environment: str, cpn_list: List[int]):
+    """Send simple notification to Discord webhook"""
+    cpns = ", ".join(map(str, cpn_list))
+    message = f"CPNs pasados a {environment.upper()}: {cpns}"
+
+    try:
+        requests.post(
+            "https://discord.com/api/webhooks/1412928175624814612/3s2gX0--GGk-XswQ-7bI1aCrowB7hTrHBpde_J2GCI7v4YZLq7kF88LP7Qh6-c8AUY-R",
+            json={
+                "username": "InfiniBOT",
+                "avatar_url": "https://static.wikia.nocookie.net/the-scrappy/images/b/bc/Screenshot_Snarf.jpg",
+                "content": message,
+            },
+            timeout=5,
+        )
+    except Exception:
+        pass
 
 
 class ToBetaRequest(BaseModel):
@@ -120,6 +140,9 @@ async def to_beta(
     successful = sum(1 for r in results if r["success"])
     failed = len(results) - successful
 
+    # Send Discord notification
+    send_discord_notification("beta", cpn_list)
+
     return ToBetaResponse(
         message=f"Processed {len(cpn_list)} company(ies) to beta environment",
         total=len(cpn_list),
@@ -161,6 +184,9 @@ async def to_master(
     # Count successes and failures
     successful = sum(1 for r in results if r["success"])
     failed = len(results) - successful
+
+    # Send Discord notification
+    send_discord_notification("master", cpn_list)
 
     return ToBetaResponse(
         message=f"Processed {len(cpn_list)} company(ies) to master environment",
