@@ -15,10 +15,24 @@ app = FastAPI(
 )
 
 
-def send_discord_notification(environment: str, cpn_list: List[int]):
+def send_discord_notification(
+    environment: str, success_cpn: Optional[List[str]], failed_cpn: Optional[List[str]]
+):
     """Send simple notification to Discord webhook"""
-    cpns = ", ".join(map(str, cpn_list))
-    message = f"CPNs pasados a {environment.upper()}: {cpns}"
+    message_parts = []
+
+    if success_cpn:
+        success_str = ", ".join(map(str, success_cpn))
+        message_parts.append(f"CPNs pasados a {environment.upper()}: {success_str}")
+
+    if failed_cpn:
+        failed_str = ", ".join(map(str, failed_cpn))
+        message_parts.append(f"CPNs fallidos: {failed_str}")
+
+    if not message_parts:
+        return
+
+    message = "\n".join(message_parts)
 
     try:
         requests.post(
@@ -136,12 +150,15 @@ async def to_beta(
 
     results = await asyncio.gather(*tasks)
 
+    success_cpn = [r["cpn"] for r in results if r["success"]]
+    failed_cpn = [r["cpn"] for r in results if not r["success"]]
+
     # Count successes and failures
-    successful = sum(1 for r in results if r["success"])
+    successful = len(success_cpn)
     failed = len(results) - successful
 
     # Send Discord notification
-    send_discord_notification("beta", cpn_list)
+    send_discord_notification("beta", success_cpn, failed_cpn)
 
     return ToBetaResponse(
         message=f"Processed {len(cpn_list)} company(ies) to beta environment",
@@ -181,12 +198,15 @@ async def to_master(
 
     results = await asyncio.gather(*tasks)
 
+    success_cpn = [r["cpn"] for r in results if r["success"]]
+    failed_cpn = [r["cpn"] for r in results if not r["success"]]
+
     # Count successes and failures
-    successful = sum(1 for r in results if r["success"])
+    successful = len(success_cpn)
     failed = len(results) - successful
 
     # Send Discord notification
-    send_discord_notification("master", cpn_list)
+    send_discord_notification("master", success_cpn, failed_cpn)
 
     return ToBetaResponse(
         message=f"Processed {len(cpn_list)} company(ies) to master environment",
